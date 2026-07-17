@@ -14,7 +14,7 @@ them.
 - Hermes Agent 0.18.2 or newer
 - an Anthropic setup token already configured in Hermes
 - Claude Pro or Max subscription access
-- Git SSH access to this private repository
+- GitHub access to this private repository (`gh auth login` is recommended)
 
 The plugin does not create, refresh, print, upload, or store your setup token.
 Hermes remains responsible for credential discovery and storage.
@@ -23,9 +23,25 @@ Hermes remains responsible for credential discovery and storage.
 
 ```bash
 hermes plugins install \
-  git@github.com:evgeniy270894/hermes-anthropic-subscription-provider.git \
+  https://github.com/evgeniy270894/hermes-anthropic-subscription-provider.git \
   --enable
 hermes gateway restart
+```
+
+For a private repository, authenticate Git over HTTPS first:
+
+```bash
+gh auth login
+gh auth setup-git
+```
+
+SSH also works when the active SSH key belongs to a GitHub account that has
+access to this repository:
+
+```bash
+hermes plugins install \
+  git@github.com:evgeniy270894/hermes-anthropic-subscription-provider.git \
+  --enable
 ```
 
 Keep the normal Hermes provider and model configuration:
@@ -105,4 +121,3 @@ binary; the plugin is pure Python.
 
 See [after-install.md](after-install.md) for a short operator checklist and the
 design documents under `docs/superpowers/` for the full technical rationale.
-

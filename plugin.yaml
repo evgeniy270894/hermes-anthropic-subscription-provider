@@ -1,7 +1,6 @@
 manifest_version: 1
 name: anthropic-subscription-provider
 kind: standalone
-version: 0.1.0
+version: 0.1.1
 description: Native Anthropic OAuth/setup-token compatibility transport for Hermes Agent
 author: evgeniy270894
-
