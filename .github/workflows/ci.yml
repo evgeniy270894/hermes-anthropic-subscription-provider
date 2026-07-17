@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.label }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: Linux x86_64
+            python: "3.11"
+          - os: ubuntu-24.04
+            label: Linux x86_64
+            python: "3.13"
+          - os: macos-15
+            label: macOS ARM64
+            python: "3.11"
+          - os: macos-15
+            label: macOS ARM64
+            python: "3.13"
+          - os: macos-15-intel
+            label: macOS Intel
+            python: "3.11"
+          - os: macos-15-intel
+            label: macOS Intel
+            python: "3.13"
+
+    steps:
+      - name: Check out provider plugin
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check out pristine Hermes Agent
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: NousResearch/hermes-agent
+          path: hermes-agent
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: hermes-agent/uv.lock
+
+      - name: Install Python and Hermes dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv python install "${{ matrix.python }}"
+          uv sync --project hermes-agent --locked \
+            --python "${{ matrix.python }}" \
+            --extra anthropic \
+            --extra dev
+
+      - name: Run focused checks
+        shell: bash
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hermes-agent
+          ANTHROPIC_TOKEN: ""
+          ANTHROPIC_API_KEY: ""
+          CLAUDE_CODE_OAUTH_TOKEN: ""
+        run: |
+          set -euo pipefail
+          uv run --project hermes-agent python -m compileall -q \
+            __init__.py compat.py prompt_rewrite.py tool_aliases.py transport.py \
+            scripts/live_e2e.py
+          uv run --project hermes-agent ruff check \
+            __init__.py compat.py prompt_rewrite.py tool_aliases.py transport.py \
+            scripts/live_e2e.py tests
+          uv run --project hermes-agent python -m pytest -q tests
+          git diff --check
+
+      - name: Verify real Hermes plugin installer
+        shell: bash
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hermes-agent
+          HERMES_HOME: ${{ runner.temp }}/hermes-home
+          ANTHROPIC_TOKEN: ""
+          ANTHROPIC_API_KEY: ""
+          CLAUDE_CODE_OAUTH_TOKEN: ""
+        run: |
+          set -euo pipefail
+          uv run --project hermes-agent hermes plugins install \
+            "file://${GITHUB_WORKSPACE}" --enable
+          uv run --project hermes-agent python - <<'PY'
+          from hermes_cli.plugins import discover_plugins, get_plugin_manager
+
+          discover_plugins()
+          assert "anthropic-subscription-provider" in get_plugin_manager()._plugins
+
+          from agent.transports import get_transport
+
+          transport = get_transport("anthropic_messages")
+          assert getattr(type(transport), "_anthropic_subscription_provider", False)
+          print("PLUGIN_INSTALL=PASS")
+          PY
+
+      - name: Scan repository for committed credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if rg -l --hidden --glob '!.git/**' --glob '!hermes-agent/**' \
+            'sk-ant-oat01-[A-Za-z0-9_-]{20,}|Authorization[[:space:]]*:[[:space:]]*(Bearer|Basic)' \
+            . > "${RUNNER_TEMP}/credential-files.txt"; then
+            echo "Credential-like material found in:"
+            sed -n '1,20p' "${RUNNER_TEMP}/credential-files.txt"
+            exit 1
+          fi
+          echo "SECRET_SCAN=PASS"
+
