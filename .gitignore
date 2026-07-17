@@ -1,0 +1,10 @@
+.worktrees/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.env
+*.log
+live-e2e-output/
+anthropic-oauth*.json
