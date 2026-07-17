@@ -22,6 +22,31 @@ def rewrite_explicit_tool_references(
 
     ordered_names = sorted(forward_map, key=len, reverse=True)
 
+    # Exact backticked identifiers are tool labels and should align. Protect
+    # every other code span, URL, and quoted string before applying call- and
+    # directive-shaped rewrites so examples and terminal payloads stay byte
+    # identical. Placeholders contain no valid tool-name characters.
+    for internal_name in ordered_names:
+        wire_name = forward_map[internal_name]
+        if internal_name and internal_name != wire_name:
+            text = text.replace(f"`{internal_name}`", f"`{wire_name}`")
+
+    protected: list[str] = []
+
+    def protect(match: re.Match[str]) -> str:
+        protected.append(match.group(0))
+        return f"\x00HASP_PROTECTED_{len(protected) - 1}\x00"
+
+    protection_patterns = (
+        re.compile(r"```[\s\S]*?```"),
+        re.compile(r"`[^`\n]+`"),
+        re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]*://[^\s<>]+"),
+        re.compile(r'"(?:\\.|[^"\\])*"'),
+        re.compile(r"(?<![A-Za-z0-9])'(?:\\.|[^'\\])*'(?![A-Za-z0-9])"),
+    )
+    for pattern in protection_patterns:
+        text = pattern.sub(protect, text)
+
     def identifier_pattern(internal_name: str) -> str:
         # Slash/dot exclusions protect paths and qualified-code components.
         return (
@@ -29,12 +54,11 @@ def rewrite_explicit_tool_references(
             rf"(?![A-Za-z0-9_./])"
         )
 
-    # Explicit syntax is safe to replace wherever it occurs.
+    # Explicit syntax is safe to replace outside protected payload spans.
     for internal_name in ordered_names:
         wire_name = forward_map[internal_name]
         if not internal_name or internal_name == wire_name:
             continue
-        text = text.replace(f"`{internal_name}`", f"`{wire_name}`")
         identifier = identifier_pattern(internal_name)
         text = re.sub(rf"{identifier}(?=\s*\()", wire_name, text)
         text = re.sub(
@@ -70,5 +94,7 @@ def rewrite_explicit_tool_references(
                 )
         return segment
 
-    return directive.sub(rewrite_directive, text)
-
+    text = directive.sub(rewrite_directive, text)
+    for index, value in enumerate(protected):
+        text = text.replace(f"\x00HASP_PROTECTED_{index}\x00", value)
+    return text

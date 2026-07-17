@@ -56,6 +56,8 @@ def test_explicit_prompt_rewrite_preserves_paths_urls_and_prose(plugin_package):
         "Use skill_manage(action='patch'), `skill_view`, or the skills_list tool.\n"
         "Available tools: read_file or terminal\n"
         "Docs: https://hermes-agent.nousresearch.com/read_file\n"
+        "Query: https://example.test/?tool=read_file(mode=raw)\n"
+        "Shell: `bash -lc \"read_file(mode=raw)\"`\n"
         "Path: /Users/evgenii/Desktop/My projects/hermes-agent/tests/read_file.py\n"
         "The terminal window and read_file.py example are ordinary prose."
     )
@@ -65,6 +67,8 @@ def test_explicit_prompt_rewrite_preserves_paths_urls_and_prose(plugin_package):
     assert "mcp__skills_list tool" in result
     assert "Available tools: mcp__read_file or mcp__terminal" in result
     assert "https://hermes-agent.nousresearch.com/read_file" in result
+    assert "https://example.test/?tool=read_file(mode=raw)" in result
+    assert '`bash -lc "read_file(mode=raw)"`' in result
     assert "/hermes-agent/tests/read_file.py" in result
     assert "The terminal window and read_file.py example" in result
 
@@ -83,4 +87,3 @@ def test_tool_arguments_are_not_part_of_identity_mapping(plugin_package):
         "command": command,
         "workdir": workdir,
     }
-

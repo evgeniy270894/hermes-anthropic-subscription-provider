@@ -64,12 +64,13 @@ def inspect_host(base_transport: Any) -> HostCompatibility:
             )
 
     try:
+        probe_messages = [
+            {"role": "system", "content": "Use skill_manage(action='list')."},
+            {"role": "user", "content": "Reply OK."},
+        ]
         probe = base_transport.build_kwargs(
             model="claude-sonnet-4-5",
-            messages=[
-                {"role": "system", "content": "Use skill_manage(action='list')."},
-                {"role": "user", "content": "Reply OK."},
-            ],
+            messages=probe_messages,
             tools=[
                 {
                     "type": "function",
@@ -90,6 +91,31 @@ def inspect_host(base_transport: Any) -> HostCompatibility:
         ]
         if probe_names != ["mcp__skill_manage"]:
             raise ValueError(f"unexpected OAuth alias probe result {probe_names!r}")
+
+        from agent.anthropic_adapter import convert_messages_to_anthropic
+
+        original_system, _ = convert_messages_to_anthropic(probe_messages)
+        original_blocks = (
+            original_system
+            if isinstance(original_system, list)
+            else ([{"type": "text", "text": original_system}] if original_system else [])
+        )
+        upstream_blocks = probe.get("system")
+        if not isinstance(upstream_blocks, list):
+            raise ValueError("OAuth system prompt is not a block list")
+        if len(upstream_blocks) != len(original_blocks) + 1:
+            raise ValueError(
+                "OAuth system prompt does not contain exactly one "
+                "upstream-added identity block"
+            )
+        identity = upstream_blocks[0]
+        if (
+            not isinstance(identity, dict)
+            or identity.get("type") != "text"
+            or not isinstance(identity.get("text"), str)
+            or not identity["text"].strip()
+        ):
+            raise ValueError("OAuth identity block is not non-empty text")
 
         from agent.transports.types import ToolCall
 
@@ -155,4 +181,3 @@ def install_transport_override() -> HostCompatibility:
         compatibility.supported,
     )
     return compatibility
-

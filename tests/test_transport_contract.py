@@ -84,6 +84,40 @@ def test_non_oauth_delegates_exactly(plugin_package):
     )
 
 
+def test_oauth_tool_choice_none_omits_schemas_without_alias_validation(plugin_package):
+    transport = _transport(plugin_package)
+    kwargs = transport.build_kwargs(
+        model="claude-opus-4-8",
+        messages=[
+            {"role": "system", "content": "Use read_file(path='/tmp/check')."},
+            {"role": "user", "content": "Do not use a tool."},
+        ],
+        tools=[_function_tool("read_file")],
+        max_tokens=32,
+        is_oauth=True,
+        tool_choice="none",
+    )
+    assert "tools" not in kwargs
+    assert "tool_choice" not in kwargs
+    system_text = "\n".join(block.get("text", "") for block in kwargs["system"])
+    assert "read_file(path='/tmp/check')" in system_text
+    assert "mcp__read_file" not in system_text
+
+
+def test_oauth_identity_is_preserved_structurally_and_drift_fails_closed(
+    plugin_package,
+):
+    module = importlib.import_module(f"{plugin_package.__name__}.transport")
+    original = [{"type": "text", "text": "Original system"}]
+    future_identity = {"type": "text", "text": "Future upstream OAuth identity"}
+    assert module._restore_original_system([future_identity, *original], original) == [
+        future_identity,
+        *original,
+    ]
+    with pytest.raises(RuntimeError, match="exactly one"):
+        module._restore_original_system(original, original)
+
+
 def test_response_tool_name_round_trips_through_exact_request_map(plugin_package):
     transport = _transport(plugin_package)
     transport.build_kwargs(
@@ -155,4 +189,3 @@ def test_collision_is_rejected_before_upstream_request(plugin_package):
             max_tokens=64,
             is_oauth=True,
         )
-

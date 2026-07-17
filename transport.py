@@ -25,16 +25,29 @@ def _restore_original_system(
     upstream_system: Any,
     original_system: Any,
 ) -> list[dict[str, Any]]:
-    """Keep upstream's OAuth identity block and restore original system text."""
+    """Keep one upstream OAuth identity block and restore original system text.
+
+    The identity text is owned by Hermes and may change between releases.  Use
+    its structural position instead of matching product wording, while failing
+    closed if the upstream request no longer has exactly one added text block.
+    """
 
     upstream_blocks = _as_system_blocks(upstream_system)
-    identity_blocks: list[dict[str, Any]] = []
-    if upstream_blocks:
-        first = upstream_blocks[0]
-        first_text = first.get("text") if first.get("type") == "text" else None
-        if isinstance(first_text, str) and "Claude Code" in first_text:
-            identity_blocks.append(first)
-    return identity_blocks + _as_system_blocks(original_system)
+    original_blocks = _as_system_blocks(original_system)
+    added_count = len(upstream_blocks) - len(original_blocks)
+    if added_count != 1:
+        raise RuntimeError(
+            "Hermes OAuth identity shape changed: expected exactly one "
+            f"upstream-added system block, got {added_count}"
+        )
+    identity = upstream_blocks[0]
+    identity_text = identity.get("text") if identity.get("type") == "text" else None
+    if not isinstance(identity_text, str) or not identity_text.strip():
+        raise RuntimeError(
+            "Hermes OAuth identity shape changed: the added system block is "
+            "not non-empty text"
+        )
+    return [identity] + original_blocks
 
 
 def _rewrite_system_blocks(
@@ -122,7 +135,12 @@ def make_subscription_transport(
 
             safe_messages = copy.deepcopy(messages)
             safe_tools = copy.deepcopy(tools) if tools is not None else None
-            name_maps = build_tool_name_maps(safe_tools)
+            specific_choice = params.get("tool_choice")
+            # Anthropic has no native tool_choice="none". Hermes implements it
+            # by omitting every schema, so there is intentionally no effective
+            # tool identity to align or reverse-map for this request.
+            effective_tools = None if specific_choice == "none" else safe_tools
+            name_maps = build_tool_name_maps(effective_tools)
 
             # Convert the original system independently so we can retain the
             # upstream OAuth identity block without inheriting Hermes's broad
@@ -152,7 +170,6 @@ def make_subscription_transport(
             else:
                 result.pop("system", None)
 
-            specific_choice = params.get("tool_choice")
             choice = result.get("tool_choice")
             if (
                 isinstance(specific_choice, str)
