@@ -332,7 +332,7 @@ Expected: `Added anthropic credential ... "local-setup-primary"`.
 Use an SSH-to-stdin pipeline so the token is never rendered locally:
 
 ```bash
-ssh root@176.223.139.23 "python3 -c 'from pathlib import Path; p=Path(\"/root/.hermes/profiles/jarvis/.env\"); rows=[line.partition(\"=\")[2].strip().strip(chr(34)).strip(chr(39)) for line in p.read_text().splitlines() if line.partition(\"=\")[0].strip()==\"ANTHROPIC_TOKEN\"]; raise SystemExit(2) if len(rows)!=1 else print(rows[0])'" \
+ssh root@176.223.139.23 "python3 -c 'from pathlib import Path; p=Path(\"/root/.hermes/profiles/jarvis/.env\"); rows=[line.partition(\"=\")[2].strip().strip(chr(34)).strip(chr(39)) for line in p.read_text().splitlines() if line.partition(\"=\")[0].strip()==\"ANTHROPIC_TOKEN\"]; assert len(rows)==1; print(rows[0])'" \
 | /Users/evgenii/.hermes/hermes-agent/venv/bin/python -c '
 import sys
 import uuid
