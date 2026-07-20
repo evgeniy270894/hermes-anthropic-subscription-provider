@@ -23,7 +23,7 @@ Hermes evaluates credentials and providers in this order:
 1. A local Anthropic setup token supplied specifically for the local agent.
 2. The setup token used by the VPS Jarvis deployment, which belongs to a
    different Anthropic account.
-3. OpenAI Codex OAuth using model `gpt-5.5`.
+3. OpenAI Codex OAuth using model `gpt-5.6-sol`.
 
 The local Claude Code OAuth credential is not part of the chain. Its
 `claude_code` source must be suppressed in the local Hermes auth store so that
@@ -63,7 +63,7 @@ added to the top-level `fallback_providers` chain:
 ```yaml
 fallback_providers:
   - provider: openai-codex
-    model: gpt-5.5
+    model: gpt-5.6-sol
 ```
 
 Hermes receives its own OpenAI device-code OAuth session. The existing Codex
@@ -83,7 +83,7 @@ first healthy setup token.
 - HTTP 401/403 attempts the provider's normal auth recovery and rotates if the
   credential remains unusable.
 - When both Anthropic credentials are exhausted, Hermes activates
-  `openai-codex/gpt-5.5` for the current turn.
+  `openai-codex/gpt-5.6-sol` for the current turn.
 - A later turn tries the primary route again according to Hermes's normal
   per-turn fallback and credential cooldown behavior.
 
@@ -130,7 +130,7 @@ checkout.
 2. `hermes auth list anthropic` shows exactly the two intended setup-token
    credentials in the correct order and no active `claude_code` entry.
 3. Reloading the pool preserves that order and suppression state.
-4. A direct OpenAI Codex request using `gpt-5.5` returns a valid response.
+4. A direct OpenAI Codex request using `gpt-5.6-sol` returns a valid response.
 5. A normal Anthropic request returns a valid response through the subscription
    plugin.
 6. A controlled credential-failure test demonstrates Anthropic credential
