@@ -28,7 +28,10 @@ Hermes evaluates credentials and providers in this order:
 The local Claude Code OAuth credential is not part of the chain. Its
 `claude_code` source must be suppressed in the local Hermes auth store so that
 automatic credential discovery cannot silently restore it on a later gateway
-restart.
+restart. The plugin also guards Hermes's direct Anthropic token resolver:
+while the source is suppressed, the resolver must not read Claude Code from
+the macOS Keychain or `~/.claude/.credentials.json`. Claude Code's own stored
+credentials remain untouched and continue working outside Hermes.
 
 ## Components and Responsibilities
 
@@ -47,13 +50,19 @@ file.
 
 ### Anthropic subscription compatibility plugin
 
-The existing `anthropic-subscription-provider` plugin remains enabled. It is
-responsible only for subscription-compatible Anthropic request shaping and
+The existing `anthropic-subscription-provider` plugin remains enabled. It
+continues to provide subscription-compatible Anthropic request shaping and
 bidirectional tool-name mapping.
 
-Credential selection, cooldowns, and failover remain owned by Hermes core. No
-failover monkeypatch or proxy behavior will be added to the plugin in this
-change.
+The plugin adds one narrowly scoped credential-source guard. When Hermes has
+persisted `suppressed_sources.anthropic` containing `claude_code`, calls to the
+direct Anthropic token resolver skip both Claude Code credential stores and
+resolve only explicitly configured environment/pool credentials. Removing the
+suppression restores upstream resolver behavior.
+
+Credential selection, cooldowns, and failover remain owned by Hermes core.
+The guard does not classify errors, rotate credentials, select providers, or
+change retry timing. No proxy behavior is added.
 
 ### OpenAI Codex fallback
 
@@ -109,12 +118,19 @@ fingerprints only.
 
 ## Implementation Boundaries
 
-The change is a local runtime configuration operation, not a fork of Hermes
-and not a new plugin release. Existing source repositories remain unchanged
-except for this design and its implementation plan.
+The change combines local runtime configuration with a small release of the
+existing standalone plugin. It is not a fork of Hermes and introduces no new
+service.
+
+Plugin source changes are limited to a focused Claude Code suppression guard,
+registration wiring, compatibility tests, a patch-version bump, and operator
+documentation. The updated private plugin repository is the durable source;
+the local Hermes plugin installation is updated through Hermes's normal plugin
+manager.
 
 Required state changes are limited to:
 
+- the installed `anthropic-subscription-provider` plugin version;
 - local Hermes credential-pool entries and suppression metadata;
 - local `credential_pool_strategies.anthropic: fill_first`;
 - local OpenAI Codex OAuth state;
@@ -130,18 +146,21 @@ checkout.
 2. `hermes auth list anthropic` shows exactly the two intended setup-token
    credentials in the correct order and no active `claude_code` entry.
 3. Reloading the pool preserves that order and suppression state.
-4. A direct OpenAI Codex request using `gpt-5.6-sol` returns a valid response.
-5. A normal Anthropic request returns a valid response through the subscription
+4. A resolver test proves that a suppressed `claude_code` source cannot read
+   the Keychain or credentials file, while removing suppression restores the
+   original resolver behavior.
+5. A direct OpenAI Codex request using `gpt-5.6-sol` returns a valid response.
+6. A normal Anthropic request returns a valid response through the subscription
    plugin.
-6. A controlled credential-failure test demonstrates Anthropic credential
+7. A controlled credential-failure test demonstrates Anthropic credential
    rotation without exposing either token.
-7. A controlled all-Anthropic-unavailable test demonstrates activation of the
+8. A controlled all-Anthropic-unavailable test demonstrates activation of the
    OpenAI Codex fallback.
-8. The fallback model can perform a normal text response and a terminal/Bash
+9. The fallback model can perform a normal text response and a terminal/Bash
    tool call without corrupting tool history.
-9. After restarting the local gateway, Telegram polling is healthy and the
+10. After restarting the local gateway, Telegram polling is healthy and the
    configured pools and fallback chain remain intact.
-10. VPS Jarvis configuration and service state are unchanged.
+11. VPS Jarvis configuration and service state are unchanged.
 
 Temporary failure injection must operate on backed-up local state or an
 isolated local test profile and must be reverted before the gateway is handed
