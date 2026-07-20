@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 def register(ctx) -> None:
@@ -18,7 +18,9 @@ def register(ctx) -> None:
     """
 
     from .compat import install_transport_override
+    from .credential_guard import install_claude_code_suppression_guard
 
+    install_claude_code_suppression_guard()
     compatibility = install_transport_override()
     if compatibility.error:
         logger.error(

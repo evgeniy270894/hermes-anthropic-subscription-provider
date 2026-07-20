@@ -43,3 +43,13 @@ hermes gateway restart
 The plugin never needs the setup token as a command-line argument. Do not pass
 or print the token while troubleshooting.
 
+To exclude the local Claude Code login without deleting its credentials, run:
+
+```bash
+hermes auth remove anthropic claude_code
+```
+
+While that source is suppressed, the plugin prevents the direct Anthropic
+resolver from reading the macOS Keychain or `~/.claude/.credentials.json`.
+Those credentials and files are not modified. Re-adding an Anthropic
+credential clears the suppression and restores upstream resolver behavior.

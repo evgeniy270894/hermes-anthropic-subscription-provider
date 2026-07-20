@@ -21,11 +21,16 @@ def test_install_transport_override_is_active_and_idempotent(plugin_package):
 
 def test_plugin_entrypoint_registers_transport(plugin_package):
     plugin_package.register(object())
+    from agent import anthropic_adapter
     from agent.transports import get_transport
 
+    assert getattr(
+        anthropic_adapter.resolve_anthropic_token,
+        "_anthropic_subscription_claude_suppression_guard",
+        False,
+    )
     assert getattr(
         type(get_transport("anthropic_messages")),
         "_anthropic_subscription_provider",
         False,
     )
-

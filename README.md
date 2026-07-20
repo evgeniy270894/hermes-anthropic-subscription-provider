@@ -19,6 +19,12 @@ them.
 The plugin does not create, refresh, print, upload, or store your setup token.
 Hermes remains responsible for credential discovery and storage.
 
+When `hermes auth remove anthropic claude_code` suppresses the Claude Code
+source, the plugin also prevents Hermes's direct fallback resolver from reading
+the macOS Keychain or `~/.claude/.credentials.json`. Those credentials and
+files are not modified. Re-adding an Anthropic credential clears the
+suppression and restores the upstream resolver behavior.
+
 ## Install
 
 ```bash
