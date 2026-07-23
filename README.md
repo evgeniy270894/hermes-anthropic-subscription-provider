@@ -11,10 +11,9 @@ them.
 
 ## Requirements
 
-- Hermes Agent 0.18.2 or newer
+- Hermes Agent 0.18.2 or newer (verified on 0.18.2 and 0.19.0)
 - an Anthropic setup token already configured in Hermes
 - Claude Pro or Max subscription access
-- GitHub access to this private repository (`gh auth login` is recommended)
 
 The plugin does not create, refresh, print, upload, or store your setup token.
 Hermes remains responsible for credential discovery and storage.

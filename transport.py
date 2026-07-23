@@ -190,8 +190,14 @@ def make_subscription_transport(
 
         def normalize_response(self, response, **kwargs):
             normalize_kwargs = dict(kwargs)
-            normalize_kwargs["strip_tool_prefix"] = False
-            normalize_kwargs.pop("tool_name_map", None)
+            # Only claim ownership of un-aliasing when this instance actually
+            # shaped the request. agent/auxiliary_client.py builds kwargs via
+            # build_anthropic_kwargs directly and then normalizes on a FRESH
+            # transport instance; there upstream's own stripping must stay in
+            # charge, or OAuth tool names reach the dispatcher as mcp__<name>.
+            if self._last_request_was_oauth:
+                normalize_kwargs["strip_tool_prefix"] = False
+                normalize_kwargs.pop("tool_name_map", None)
             normalized = super().normalize_response(response, **normalize_kwargs)
             if self._last_request_was_oauth and normalized.tool_calls:
                 for tool_call in normalized.tool_calls:

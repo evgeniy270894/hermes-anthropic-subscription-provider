@@ -9,7 +9,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _MIN_HERMES_VERSION = "0.18.2"
-_TESTED_HERMES_VERSION = "0.18.2"
+_TESTED_HERMES_VERSIONS = ("0.18.2", "0.19.0")
 
 
 @dataclass(frozen=True)
@@ -131,10 +131,11 @@ def inspect_host(base_transport: Any) -> HostCompatibility:
         )
 
     warning = ""
-    if hermes_version != _TESTED_HERMES_VERSION:
+    if hermes_version not in _TESTED_HERMES_VERSIONS:
         warning = (
             f"feature probes passed on untested Hermes {hermes_version}; "
-            f"latest explicitly tested version is {_TESTED_HERMES_VERSION}"
+            f"explicitly tested versions are "
+            f"{', '.join(_TESTED_HERMES_VERSIONS)}"
         )
     return HostCompatibility(
         supported=True,

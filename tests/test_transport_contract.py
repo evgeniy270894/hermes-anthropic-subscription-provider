@@ -189,3 +189,38 @@ def test_collision_is_rejected_before_upstream_request(plugin_package):
             max_tokens=64,
             is_oauth=True,
         )
+
+
+def test_normalize_keeps_upstream_stripping_on_a_fresh_instance(plugin_package):
+    """agent/auxiliary_client.py bypasses build_kwargs and normalizes on a fresh
+    transport. Forcing strip_tool_prefix off there left OAuth tool names as
+    mcp__<name> -- neither stripped by Hermes nor reverse-mapped by us."""
+    module = importlib.import_module(f"{plugin_package.__name__}.transport")
+    captured: dict = {}
+
+    class Base:
+        def normalize_response(self, response, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(tool_calls=[])
+
+    fresh = module.make_subscription_transport(Base)()
+    assert fresh._last_request_was_oauth is False
+    fresh.normalize_response(object(), strip_tool_prefix=True)
+    assert captured["strip_tool_prefix"] is True
+
+
+def test_normalize_takes_over_stripping_after_an_oauth_request(plugin_package):
+    """When this instance did shape an OAuth request, it owns un-aliasing."""
+    module = importlib.import_module(f"{plugin_package.__name__}.transport")
+    captured: dict = {}
+
+    class Base:
+        def normalize_response(self, response, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(tool_calls=[])
+
+    inst = module.make_subscription_transport(Base)()
+    inst._last_request_was_oauth = True
+    inst.normalize_response(object(), strip_tool_prefix=True, tool_name_map={"a": "b"})
+    assert captured["strip_tool_prefix"] is False
+    assert "tool_name_map" not in captured
